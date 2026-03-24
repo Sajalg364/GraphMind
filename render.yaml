@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: sap-o2c-graph-explorer
+    runtime: python
+    buildCommand: bash build.sh
+    startCommand: bash start.sh
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: PYTHON_VERSION
+        value: "3.12.0"
+      - key: NODE_VERSION
+        value: "20.11.0"
