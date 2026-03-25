@@ -11,19 +11,19 @@ ENTITY_CONFIG = {
         "table": "outbound_delivery_headers",
         "id_col": "deliveryDocument",
         "label_col": "deliveryDocument",
-        "color": "#50C878",
+        "color": "#2ECC71",
     },
     "BillingDocument": {
         "table": "billing_document_headers",
         "id_col": "billingDocument",
         "label_col": "billingDocument",
-        "color": "#FF6B6B",
+        "color": "#E74C3C",
     },
     "JournalEntry": {
         "table": "journal_entry_items",
         "id_col": "accountingDocument",
         "label_col": "accountingDocument",
-        "color": "#FFB347",
+        "color": "#F39C12",
     },
     "Payment": {
         "table": "payments",
@@ -35,19 +35,19 @@ ENTITY_CONFIG = {
         "table": "business_partners",
         "id_col": "businessPartner",
         "label_col": "businessPartnerName",
-        "color": "#1ABC9C",
+        "color": "#00BCD4",
     },
     "Product": {
         "table": "products",
         "id_col": "product",
         "label_col": "product",
-        "color": "#E74C3C",
+        "color": "#FF6F61",
     },
     "Plant": {
         "table": "plants",
         "id_col": "plant",
         "label_col": "plantName",
-        "color": "#3498DB",
+        "color": "#8BC34A",
     },
 }
 

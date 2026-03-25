@@ -5,13 +5,13 @@ import { fetchGraph, fetchNodeDetails, fetchNeighbors, sendChat, fetchStats } fr
 
 const ENTITY_COLORS = {
   SalesOrder: '#4A90D9',
-  Delivery: '#50C878',
-  BillingDocument: '#FF6B6B',
-  JournalEntry: '#FFB347',
+  Delivery: '#2ECC71',
+  BillingDocument: '#E74C3C',
+  JournalEntry: '#F39C12',
   Payment: '#9B59B6',
-  Customer: '#1ABC9C',
-  Product: '#E74C3C',
-  Plant: '#3498DB',
+  Customer: '#00BCD4',
+  Product: '#FF6F61',
+  Plant: '#8BC34A',
 }
 
 const EXAMPLE_QUERIES = [
