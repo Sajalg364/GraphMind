@@ -137,6 +137,15 @@ def query_llm(user_question: str, conversation_history: list = None) -> dict:
 
             results_str = json.dumps(results[:100], default=str)
 
+            if not results:
+                return {
+                    "type": "sql",
+                    "answer": "The query returned no results. Try rephrasing your question or checking if the referenced entities exist in the dataset.",
+                    "sql": sql,
+                    "rowCount": 0,
+                    "data": [],
+                }
+
             answer_response = client.models.generate_content(
                 model=MODEL,
                 contents=[{"role": "user", "parts": [{"text": ANSWER_PROMPT.format(question=user_question, sql=sql, results=results_str)}]}],

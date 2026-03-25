@@ -1,4 +1,5 @@
 import os
+from functools import lru_cache
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -27,9 +28,13 @@ def startup():
         init_db()
 
 
+_graph_cache = {}
+
 @app.get("/api/graph")
 def get_graph(limit: int = 300):
-    return build_graph_data(limit_nodes=limit)
+    if limit not in _graph_cache:
+        _graph_cache[limit] = build_graph_data(limit_nodes=limit)
+    return _graph_cache[limit]
 
 
 @app.get("/api/node/{entity_type}/{entity_id}")
@@ -83,6 +88,6 @@ def get_stats():
     return stats
 
 
-FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend" / "dist"
+FRONTEND_DIR = Path(_file_).parent.parent.parent / "frontend" / "dist"
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
