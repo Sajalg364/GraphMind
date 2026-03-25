@@ -84,7 +84,8 @@ def query_llm(user_question: str, conversation_history: list = None) -> dict:
     messages = []
     if conversation_history:
         for msg in conversation_history[-6:]:
-            messages.append({"role": msg["role"], "parts": [{"text": msg["content"]}]})
+            role = "model" if msg["role"] == "assistant" else "user"
+            messages.append({"role": role, "parts": [{"text": msg["content"]}]})
 
     messages.append({"role": "user", "parts": [{"text": user_question}]})
 
