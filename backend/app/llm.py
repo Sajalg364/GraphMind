@@ -1,14 +1,18 @@
 import os
 import re
 import json
+import httpx
 from google import genai
 from dotenv import load_dotenv
 from .database import get_connection, SCHEMA_DESCRIPTION
 
 load_dotenv()
 
-client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
-MODEL = "gemini-2.5-flash"
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_MODEL = "gemini-2.5-flash"
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL = "llama-3.3-70b-versatile"
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 SYSTEM_PROMPT = f"""You are an SAP Order-to-Cash (O2C) data analyst assistant. You answer questions ONLY about the provided O2C dataset.
 
@@ -40,6 +44,12 @@ SQL RULES:
 - Always use LIMIT when the result set could be large (default LIMIT 50).
 - Use proper JOINs based on the documented relationships.
 - For the O2C flow tracing: Sales Order → Delivery (via outbound_delivery_items.referenceSdDocument) → Billing (via billing_document_items.referenceSdDocument = deliveryDocument) → Journal Entry (via journal_entry_items.referenceDocument = billingDocument) → Payment (via payments.clearingAccountingDocument = journal_entry_items.accountingDocument).
+
+CRITICAL RULES:
+- You MUST respond with EXACTLY ONE JSON object. Never output multiple JSON objects.
+- For complex questions (like flow tracing), write a SINGLE SQL query using JOINs or subqueries that retrieves all needed data at once.
+- Never break a question into multiple steps or multiple queries. Combine everything into one query.
+- Your entire response must be a single valid JSON object and nothing else — no explanatory text before or after.
 """
 
 ANSWER_PROMPT = """You are an SAP Order-to-Cash data analyst. Based on the SQL query results below, provide a clear, concise natural language answer.
@@ -80,6 +90,48 @@ def extract_json_from_response(text: str) -> dict:
             pass
     return None
 
+
+def _call_gemini(messages, system_prompt, temperature=0.1, max_tokens=2048):
+    response = gemini_client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=messages,
+        config={
+            "system_instruction": system_prompt,
+            "temperature": temperature,
+            "max_output_tokens": max_tokens,
+        }
+    )
+    return response.text
+
+
+def _call_groq(messages, system_prompt, temperature=0.1, max_tokens=2048):
+    openai_messages = [{"role": "system", "content": system_prompt}]
+    for msg in messages:
+        role = msg["role"] if msg["role"] == "user" else "assistant"
+        text = msg["parts"][0]["text"] if "parts" in msg else msg.get("content", "")
+        openai_messages.append({"role": role, "content": text})
+
+    resp = httpx.post(
+        GROQ_URL,
+        headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+        json={"model": GROQ_MODEL, "messages": openai_messages, "temperature": temperature, "max_tokens": max_tokens},
+        timeout=30.0,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"]
+
+
+def _call_llm(messages, system_prompt, temperature=0.1, max_tokens=2048):
+    try:
+        return _call_gemini(messages, system_prompt, temperature, max_tokens)
+    except Exception as gemini_err:
+        if not GROQ_API_KEY:
+            raise gemini_err
+        try:
+            return _call_groq(messages, system_prompt, temperature, max_tokens)
+        except Exception:
+            raise gemini_err
+
 def query_llm(user_question: str, conversation_history: list = None) -> dict:
     messages = []
     if conversation_history:
@@ -90,17 +142,7 @@ def query_llm(user_question: str, conversation_history: list = None) -> dict:
     messages.append({"role": "user", "parts": [{"text": user_question}]})
 
     try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=messages,
-            config={
-                "system_instruction": SYSTEM_PROMPT,
-                "temperature": 0.1,
-                "max_output_tokens": 2048,
-            }
-        )
-
-        response_text = response.text
+        response_text = _call_llm(messages, SYSTEM_PROMPT, temperature=0.1)
         parsed = extract_json_from_response(response_text)
 
         if not parsed:
@@ -147,15 +189,15 @@ def query_llm(user_question: str, conversation_history: list = None) -> dict:
                     "data": [],
                 }
 
-            answer_response = client.models.generate_content(
-                model=MODEL,
-                contents=[{"role": "user", "parts": [{"text": ANSWER_PROMPT.format(question=user_question, sql=sql, results=results_str)}]}],
-                config={"temperature": 0.2, "max_output_tokens": 2048}
+            answer_text = _call_llm(
+                [{"role": "user", "parts": [{"text": ANSWER_PROMPT.format(question=user_question, sql=sql, results=results_str)}]}],
+                ANSWER_PROMPT.format(question=user_question, sql=sql, results=results_str),
+                temperature=0.2,
             )
 
             return {
                 "type": "sql",
-                "answer": answer_response.text,
+                "answer": answer_text,
                 "sql": sql,
                 "rowCount": len(results),
                 "data": results[:50],
