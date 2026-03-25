@@ -88,6 +88,6 @@ def get_stats():
     return stats
 
 
-FRONTEND_DIR = Path(_file_).parent.parent.parent / "frontend" / "dist"
+FRONTEND_DIR = Path(__file__).parent.parent.parent / "frontend" / "dist"
 if FRONTEND_DIR.exists():
     app.mount("/", StaticFiles(directory=str(FRONTEND_DIR), html=True), name="frontend")
