@@ -125,56 +125,6 @@ classDiagram
 
 ---
 
-## LLM Prompting Strategy
-
-**Two-phase approach** with separated concerns:
-
-| Phase | Purpose | Temperature | Input | Output |
-|-------|---------|-------------|-------|--------|
-| 1 | NL → SQL | 0.1 (deterministic) | Question + full 19-table schema | `{type: "sql", sql: "SELECT..."}` |
-| 2 | Results → NL | 0.2 (fluent) | Question + SQL + result rows | Natural language summary |
-
-**Key decisions:**
-- **Schema-in-prompt** (~2K tokens) — full schema in system prompt gives Gemini complete JOIN context without RAG retrieval errors
-- **Structured JSON output** — reliable parsing vs free-text SQL extraction
-- **Explicit O2C flow path** in prompt — the cross-table join chain (SO → Delivery → Billing → JE → Payment) is non-obvious and documented
-
----
-
-## NL-to-SQL Query Flow
-
-```mermaid
-stateDiagram-v2
-    [*] --> UserAsksQuestion
-    UserAsksQuestion --> SendToGemini : POST /api/chat
-    SendToGemini --> CheckResponse
-
-    CheckResponse --> Rejection : off-topic detected
-    CheckResponse --> SQLGenerated : {type: sql, sql: ...}
-    CheckResponse --> TextAnswer : plain text
-
-    Rejection --> [*] : return rejection message
-
-    SQLGenerated --> ValidateSQL
-    ValidateSQL --> BlockedSQL : non-SELECT / dangerous
-    ValidateSQL --> ExecuteSQL : safe SELECT
-
-    BlockedSQL --> [*] : return safety error
-
-    ExecuteSQL --> EmptyResults : 0 rows
-    ExecuteSQL --> HasResults : 1+ rows
-
-    EmptyResults --> [*] : return no-results message
-
-    HasResults --> GeminiPhase2 : send results + question
-    GeminiPhase2 --> NLAnswer : natural language summary
-    NLAnswer --> [*] : return answer to user
-
-    TextAnswer --> [*]
-```
-
----
-
 ## Graph Data Model
 
 ```mermaid
@@ -233,6 +183,56 @@ classDiagram
     BillingDocument "*" --> "1" Customer : BILLED_TO
 ```
 
+---
+
+## LLM Prompting Strategy
+
+**Two-phase approach** with separated concerns:
+
+| Phase | Purpose | Temperature | Input | Output |
+|-------|---------|-------------|-------|--------|
+| 1 | NL → SQL | 0.1 (deterministic) | Question + full 19-table schema | `{type: "sql", sql: "SELECT..."}` |
+| 2 | Results → NL | 0.2 (fluent) | Question + SQL + result rows | Natural language summary |
+
+**Key decisions:**
+- **Schema-in-prompt** (~2K tokens) — full schema in system prompt gives Gemini complete JOIN context without RAG retrieval errors
+- **Structured JSON output** — reliable parsing vs free-text SQL extraction
+- **Explicit O2C flow path** in prompt — the cross-table join chain (SO → Delivery → Billing → JE → Payment) is non-obvious and documented
+
+---
+
+## NL-to-SQL Query Flow
+
+```mermaid
+stateDiagram-v2
+    [*] --> UserAsksQuestion
+    UserAsksQuestion --> SendToGemini : POST /api/chat
+    SendToGemini --> CheckResponse
+
+    CheckResponse --> Rejection : off-topic detected
+    CheckResponse --> SQLGenerated : {type: sql, sql: ...}
+    CheckResponse --> TextAnswer : plain text
+
+    Rejection --> [*] : return rejection message
+
+    SQLGenerated --> ValidateSQL
+    ValidateSQL --> BlockedSQL : non-SELECT / dangerous
+    ValidateSQL --> ExecuteSQL : safe SELECT
+
+    BlockedSQL --> [*] : return safety error
+
+    ExecuteSQL --> EmptyResults : 0 rows
+    ExecuteSQL --> HasResults : 1+ rows
+
+    EmptyResults --> [*] : return no-results message
+
+    HasResults --> GeminiPhase2 : send results + question
+    GeminiPhase2 --> NLAnswer : natural language summary
+    NLAnswer --> [*] : return answer to user
+
+    TextAnswer --> [*]
+```
+
 ## Guardrails
 
 | Layer | Mechanism |
@@ -278,7 +278,7 @@ The fallback is transparent to the user — `_call_llm()` tries Gemini first, an
 
 ```bash
 # 1. Clone and enter the project
-git clone <repo-url>
+git clone https://github.com/Sajalg364/GraphMind.git
 cd GraphMind
 
 # 2. Backend setup
